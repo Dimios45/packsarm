@@ -1,0 +1,84 @@
+{
+    "type": "sarm",
+    "n_obs_steps": 8,
+    "input_features": {
+        "observation.images.top": {
+            "type": "VISUAL",
+            "shape": [
+                480,
+                640,
+                3
+            ]
+        },
+        "observation.state": {
+            "type": "STATE",
+            "shape": [
+                32
+            ]
+        }
+    },
+    "output_features": {
+        "action": {
+            "type": "ACTION",
+            "shape": [
+                14
+            ]
+        }
+    },
+    "device": "cuda",
+    "use_amp": false,
+    "use_peft": false,
+    "push_to_hub": false,
+    "repo_id": "local/sarm_aloha_transfer_cube",
+    "private": null,
+    "tags": null,
+    "license": null,
+    "pretrained_path": null,
+    "annotation_mode": "dense_only",
+    "frame_gap": 30,
+    "max_rewind_steps": 4,
+    "image_dim": 512,
+    "text_dim": 512,
+    "hidden_dim": 768,
+    "num_heads": 12,
+    "num_layers": 8,
+    "max_state_dim": 32,
+    "drop_n_last_frames": 1,
+    "batch_size": 64,
+    "clip_batch_size": 64,
+    "dropout": 0.1,
+    "stage_loss_weight": 1.0,
+    "rewind_probability": 0.8,
+    "language_perturbation_probability": 0.2,
+    "num_sparse_stages": 1,
+    "sparse_subtask_names": [
+        "task"
+    ],
+    "sparse_temporal_proportions": [
+        1.0
+    ],
+    "num_dense_stages": 5,
+    "dense_subtask_names": [
+        "Move right arm toward the cube",
+        "Grasp the cube with right gripper",
+        "Lift cube and move toward left arm",
+        "Transfer cube to left gripper and release",
+        "Retract both arms"
+    ],
+    "dense_temporal_proportions": [
+        0.26162969948965303,
+        0.22844277339960486,
+        0.2229663519894009,
+        0.20363372636208982,
+        0.08332744875925131
+    ],
+    "pretrained_model_path": null,
+    "image_key": "observation.images.top",
+    "state_key": "observation.state",
+    "normalization_mapping": {
+        "VISUAL": "IDENTITY",
+        "STATE": "MEAN_STD",
+        "LANGUAGE": "IDENTITY",
+        "REWARD": "IDENTITY"
+    }
+}

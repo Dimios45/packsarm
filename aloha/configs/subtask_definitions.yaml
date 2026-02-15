@@ -1,0 +1,42 @@
+# Subtask Definitions for Bimanual Packing Task
+# Defines the stages/subtasks for SARM reward annotation
+
+task_name: bimanual_packing
+description: >
+  Pack objects into a box using two robot arms (ARX5 bimanual setup).
+  The task involves reaching, grasping, transporting, and placing objects.
+
+# Single-stage annotation (used with annotation_mode: single_stage)
+single_stage:
+  name: task
+  description: "Pack the object into the box"
+
+# Multi-stage annotation (for future use with annotation_mode: multi_stage)
+stages:
+  - name: reach
+    description: "Move arms to approach the object"
+    temporal_proportion: 0.2
+
+  - name: grasp
+    description: "Close grippers to grasp the object"
+    temporal_proportion: 0.1
+
+  - name: transport
+    description: "Lift and move the object toward the box"
+    temporal_proportion: 0.4
+
+  - name: place
+    description: "Lower the object into the box and release"
+    temporal_proportion: 0.2
+
+  - name: retract
+    description: "Move arms back to home position"
+    temporal_proportion: 0.1
+
+# Robot configuration
+robot:
+  type: bimanual_arx5
+  num_joints_per_arm: 6
+  has_gripper: true
+  state_dim: 14  # 6 joints + 1 gripper per arm x 2 arms
+  action_dim: 14

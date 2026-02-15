@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+
+# Virtual Environments (exclude all env directories)
+sarm-env/
+robotwin-env/
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# Model Checkpoints (too large)
+*.safetensors
+*.bin
+*.pth
+*.pt
+*.ckpt
+
+# Outputs (keep structure, ignore large files)
+outputs/*/checkpoints/
+packsarm/outputs/
+*.mp4
+*.avi
+
+# Cache
+.cache/
+*.parquet
+wandb/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keep directory structure
+!.gitkeep
