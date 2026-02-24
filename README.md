@@ -1,4 +1,9 @@
-# SARM + RA-BC for Robot Manipulation
+<div align="center">
+<picture>
+  <source media="(prefers-color-scheme: light)" srcset="docs/assets/banner_light.png">
+  <img alt="PACKSARM banner" src="docs/assets/banner_dark.png" width="100%">
+</picture>
+</div>
 
 Implementation of [Stage-Aware Reward Modeling (SARM)](https://arxiv.org/abs/2509.25358) and Reward-Aligned Behaviour Cloning (RA-BC) on bimanual robot manipulation, built on top of [LeRobot](https://github.com/huggingface/lerobot).
 
