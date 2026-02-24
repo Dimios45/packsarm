@@ -5,8 +5,10 @@ __pycache__/
 *.so
 .Python
 *.egg-info/
+dist/
+build/
 
-# Virtual Environments (exclude all env directories)
+# Virtual Environments
 sarm-env/
 robotwin-env/
 venv/
@@ -17,32 +19,38 @@ ENV/
 .vscode/
 .idea/
 *.swp
+*.swo
 
-# Model Checkpoints (too large)
+# Model Checkpoints (too large for git)
 *.safetensors
 *.bin
 *.pth
 *.pt
 *.ckpt
-
-# Outputs (keep structure, ignore large files)
 outputs/*/checkpoints/
-packsarm/outputs/
+aloha/outputs/*/checkpoints/
+
+# Training output dirs — raw runs (keep only research_report results)
+aloha/outputs/dp_aloha_*/
+aloha/outputs/act_aloha_*/
+aloha/outputs/sarm_*/
+outputs/act_aloha_*/
+outputs/dp_aloha_*/
+outputs/sarm_*/
+
+# Eval videos (large)
+*/videos/
 *.mp4
 *.avi
 
-# Cache
+# Cache & data
 .cache/
-*.parquet
 wandb/
-
-# Logs
-*.log
-logs/
+*.parquet
 
 # OS
 .DS_Store
 Thumbs.db
 
-# Keep directory structure
+# Keep placeholders
 !.gitkeep

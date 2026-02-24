@@ -1,278 +1,163 @@
-# PACKSARM: Robot Manipulation with Stage-Aware Reward Modeling
+# SARM + RA-BC for Robot Manipulation
 
-Two complete robot manipulation projects implementing SARM (Stage-Aware Reward Modeling) for behavior cloning improvement.
+Implementation of [Stage-Aware Reward Modeling (SARM)](https://arxiv.org/abs/2509.25358) and Reward-Aligned Behaviour Cloning (RA-BC) on bimanual robot manipulation, built on top of [LeRobot](https://github.com/huggingface/lerobot).
 
-**Authors:** SRA VJTI
-**Contact:** tjgada_b24@ee.vjti.ac.in
-**Institution:** Veermata Jijabai Technological Institute
+📄 **[Read the full research blog →](docs/BLOG.md)**
 
----
-
-## 📦 Projects
-
-### 1. [Packing Task](./packing/) - WBCD-Packing-RoboTwin
-Multi-object packing with dual SARM arms in RoboTwin simulation environment.
-
-**Status:** Complete ✅
-**Best Result:** 90% success rate (9/10 seeds)
-**Key Achievement:** Pretrained ResNet18 + larger crop solved vision grounding
-
-[→ Go to Packing Project](./packing/)
+**Key results:**
+- DiffusionPolicy + RA-BC: **24% success** vs **8% vanilla** (3× improvement)
+- ACT + RA-BC: **62% success** vs **68% vanilla** (−6pp, closes with correct kappa)
+- Task: AlohaTransferCube-v0 · 50 human demos · ALOHA bimanual sim
 
 ---
 
-### 2. [ALOHA Transfer Cube](./aloha/) - Bimanual Manipulation
-Cube transfer between two robot arms using ALOHA simulation.
-
-**Status:** Complete ✅
-**Best Result:** RA-BC 3x improvement over vanilla BC (24% vs 8%)
-**Key Achievement:** Validated SARM pipeline, overfitting diagnosis, ACT comparison
-
-[→ Go to ALOHA Project](./aloha/)
-
----
-
-## 🎯 Quick Comparison
-
-| Project | Environment | Task | Best Policy | Success Rate | Key Learning |
-|---------|------------|------|-------------|--------------|--------------|
-| **Packing** | RoboTwin | Multi-object packing | DiffusionPolicy v2b | **90%** (9/10) | Pretrained backbone critical |
-| **ALOHA** | gym-aloha | Bimanual cube transfer | ACT (80K) | **68%** (34/50) | ACT > Diffusion for manipulation |
-| **ALOHA** | gym-aloha | Same with RA-BC | RA-BC Diffusion (10K) | **24%** (12/50) | RA-BC gives **3x improvement** |
-
----
-
-## 🏆 Key Results Summary
-
-### Packing Task
-- ✅ **90% success** with pretrained ResNet18 + crop_shape=[224,224]
-- ✅ Fixed vision grounding issue (crop too small → objects not visible)
-- ✅ SARM v2b with ImageNet weights generalizes better
-- ✅ Solved overfitting with proper crop size
-
-### ALOHA Task
-- ✅ **RA-BC: 24% success** vs **Vanilla BC: 8%** (**3x improvement**)
-- ✅ **ACT: 68% success** (state-of-the-art for bimanual tasks)
-- ✅ Validated SARM pipeline (80% monotonicity is sufficient)
-- ✅ Diagnosed overfitting (160 epochs → 0%, 32 epochs → 24%)
-- ✅ Proved crop mismatch kills performance
-
----
-
-## 🔬 Research Contributions
-
-### 1. SARM Pipeline Validation
-Both projects prove SARM's effectiveness:
-- **Packing:** Progress-based sample weighting helps with multi-object complexity
-- **ALOHA:** 3x improvement (RA-BC vs vanilla BC) validates reward modeling
-
-### 2. Practical Debugging Methodology
-- Vision grounding diagnostics (crop analysis)
-- Overfitting detection (epoch budget management)
-- Train/eval distribution mismatch identification
-
-### 3. Policy Comparison Insights
-- ACT superior for manipulation (action chunking + temporal encoding)
-- DiffusionPolicy needs careful tuning (crop, epochs, backbone)
-- Pretrained backbones critical for small datasets
-
-### 4. Reproducible Baselines
-- Complete configs, scripts, and results
-- W&B logs for transparency
-- Lessons learned documented
-
----
-
-## 📁 Repository Structure
-
-```
-packsarm/
-├── README.md                    # This file
-├── .gitignore
-├── requirements.txt
-│
-├── packing/                     # WBCD-Packing-RoboTwin project
-│   ├── README.md               # Packing-specific docs
-│   ├── scripts/                # Training/eval scripts
-│   ├── config/                 # SARM configs
-│   ├── results/                # Training logs, eval results
-│   └── WBCD-Packing-RoboTwin/  # RoboTwin environment
-│
-├── aloha/                       # ALOHA transfer cube project
-│   ├── README.md               # ALOHA-specific docs
-│   ├── RESULTS.md              # Detailed experimental results
-│   ├── scripts/                # Training/eval scripts
-│   ├── configs/                # Model configurations
-│   │   ├── sarm/
-│   │   ├── diffusion/
-│   │   └── act/
-│   └── results/                # Training/eval data
-│       ├── training/
-│       ├── evaluation/
-│       └── comparison/
-│
-└── lerobot/                     # LeRobot library (SARM integration)
-    └── src/lerobot/
-        ├── policies/sarm/
-        └── data_processing/sarm_annotations/
-```
-
----
-
-## 🚀 Quick Start
-
-### Install Dependencies
+## Setup
 
 ```bash
-# Clone repository
 git clone https://github.com/Dimios45/packsarm.git
 cd packsarm
 
-# Create virtual environment
 python -m venv sarm-env
-source sarm-env/bin/activate  # or `sarm-env\Scripts\activate` on Windows
+source sarm-env/bin/activate
 
-# Install requirements
 pip install -r requirements.txt
-
-# Install LeRobot
 cd lerobot && pip install -e . && cd ..
 ```
 
-### Run Packing Task
+> Requires Python 3.10, CUDA GPU, MuJoCo (auto-installed via `gymnasium-robotics`).
+
+---
+
+## Quickstart
+
+### 1. Train SARM reward model
 
 ```bash
-cd packing
-./scripts/train_policy_v2b.sh  # Best config (90% success)
+source sarm-env/bin/activate
+./aloha/scripts/train_sarm_aloha.sh
 ```
 
-See [packing/README.md](./packing/README.md) for details.
-
-### Run ALOHA Task
+### 2. Compute RA-BC weights
 
 ```bash
-cd aloha
-
-# Train SARM reward model
-./scripts/train_sarm_aloha.sh
-
-# Train policy with RA-BC
-./scripts/train_dp_aloha_rabc_nocrop.sh
-
-# Evaluate
-./scripts/eval_dp_aloha.sh <checkpoint_path> 50 <run_name>
+./aloha/scripts/compute_rabc_weights.sh
 ```
 
-See [aloha/README.md](./aloha/README.md) for details.
+### 3. Train a policy
+
+```bash
+# Vanilla ACT baseline
+./aloha/scripts/train_act_aloha.sh
+
+# ACT + RA-BC (paper-accurate: sparse head, κ=0.01, Δ=25)
+./aloha/scripts/train_act_aloha_rabc_sparse_80k.sh outputs/act_rabc 80000
+
+# Vanilla DiffusionPolicy baseline
+./aloha/scripts/train_dp_aloha_bc_nocrop.sh
+
+# DiffusionPolicy + RA-BC — Stage 1
+./aloha/scripts/train_dp_aloha_rabc_sparse_10k.sh outputs/dp_rabc_run
+```
+
+### 4. Evaluate
+
+```bash
+export PYTHONPATH="lerobot/src:$PYTHONPATH"
+
+python -m lerobot.scripts.lerobot_eval \
+    --policy.path=<checkpoint>/pretrained_model \
+    --env.type=aloha \
+    --env.task=AlohaTransferCube-v0 \
+    --eval.batch_size=1 \
+    --eval.n_episodes=50 \
+    --output_dir=aloha/outputs/eval_<run_name>
+```
 
 ---
 
-## 📊 W&B Dashboards
+## Repository Structure
 
-**Packing Task:**
-- TBD (add W&B link for packing experiments)
-
-**ALOHA Task:**
-- [dimios45/packsarm-aloha-comparison](https://wandb.ai/dimios45/packsarm-aloha-comparison)
+```
+packsarm/
+├── README.md                        # This file
+├── docs/
+│   ├── BLOG.md                      # Full research write-up + results
+│   └── assets/                      # All result charts and figures
+│
+├── aloha/                           # ALOHA transfer cube experiments
+│   ├── scripts/                     # Training + eval shell scripts
+│   │   ├── train_sarm_aloha.sh      # Train SARM reward model
+│   │   ├── compute_rabc_weights.sh  # Generate sarm_progress.parquet
+│   │   ├── train_act_aloha.sh       # Vanilla ACT
+│   │   ├── train_act_aloha_rabc_sparse_80k.sh  # ACT + RA-BC (paper-accurate)
+│   │   ├── train_dp_aloha_bc_nocrop.sh          # Vanilla DiffusionPolicy
+│   │   ├── train_dp_aloha_rabc_sparse_10k.sh    # DP + RA-BC Stage 1
+│   │   ├── train_dp_aloha_rabc_stage2.sh        # DP + RA-BC Stage 2
+│   │   └── eval_dp_aloha.sh         # Evaluation wrapper
+│   ├── configs/                     # SARM + policy configs
+│   └── outputs/                     # Eval results (eval_info.json per run)
+│
+├── packing/                         # WBCD packing task experiments
+│   └── scripts/
+│
+└── lerobot/                         # Modified LeRobot fork
+    └── src/lerobot/
+        ├── policies/
+        │   ├── act/modeling_act.py          # RA-BC: per-sample loss
+        │   ├── diffusion/modeling_diffusion.py  # RA-BC: per-sample loss
+        │   └── sarm/                        # SARM model + weight computation
+        ├── utils/rabc.py                    # RaBCWeighter class
+        └── scripts/lerobot_train.py         # RA-BC training loop integration
+```
 
 ---
 
-## 📚 Citations
+## RA-BC Hyperparameters
 
-### SARM Paper
+All RA-BC settings are passed as CLI flags:
+
+| Flag | Paper value | Description |
+|------|------------|-------------|
+| `--rabc_head_mode` | `sparse` | SARM head to use for weights |
+| `--rabc_kappa` | `0.01` | Quality threshold (~top 95% of frames pass) |
+| `--rabc_chunk_size` | `25` | Progress delta lookahead Δ |
+| `--use_rabc` | `true` | Enable/disable RA-BC |
+
+Use `--use_rabc=false` for vanilla BC baseline with identical architecture.
+
+---
+
+## Results Summary
+
+| Policy | Config | Steps | Success |
+|--------|--------|-------|---------|
+| ACT | Vanilla | 80K | **68%** |
+| ACT | RA-BC (dense, κ=0.01) | 80K | 62% |
+| ACT | Vanilla | 20K | 32% |
+| ACT | RA-BC (dense, auto κ) | 20K | 34% |
+| DiffusionPolicy | Vanilla | 10K | 8% |
+| DiffusionPolicy | **RA-BC (dense)** | **10K** | **24%** |
+| DiffusionPolicy | RA-BC (sparse, κ=0.01) | 13K | 16% |
+
+Full analysis and charts: [docs/BLOG.md](docs/BLOG.md)
+
+---
+
+## Acknowledgements
+
+- [opensarm](https://github.com/xdofai/opensarm) — original SARM implementation
+- [LeRobot](https://github.com/huggingface/lerobot) — robot learning framework
+- [SARM paper](https://arxiv.org/abs/2509.25358) — Chen et al. 2025
+
+---
+
+## Citation
+
 ```bibtex
-@article{zhao2025sarm,
-  title={Stage-Aware Reward Modeling for Long Horizon Robot Manipulation},
-  author={Zhao, Tony Z. and others},
-  journal={arXiv preprint arXiv:2509.25358},
-  year={2025}
+@article{chen2025sarm,
+  title   = {SARM: Stage-Aware Reward Modeling for Long Horizon Robot Manipulation},
+  author  = {Chen, Qianzhong and Yu, Justin and Schwager, Mac and Abbeel, Pieter and Shentu, Yide and Wu, Philipp},
+  journal = {arXiv preprint arXiv:2509.25358},
+  year    = {2025}
 }
 ```
-
-### DiffusionPolicy
-```bibtex
-@inproceedings{chi2023diffusion,
-  title={Diffusion Policy: Visuomotor Policy Learning via Action Diffusion},
-  author={Chi, Cheng and others},
-  booktitle={Robotics: Science and Systems},
-  year={2023}
-}
-```
-
-### ACT (Action Chunking Transformer)
-```bibtex
-@article{zhao2023learning,
-  title={Learning Fine-Grained Bimanual Manipulation with Low-Cost Hardware},
-  author={Zhao, Tony Z. and others},
-  journal={arXiv preprint arXiv:2304.13705},
-  year={2023}
-}
-```
-
-### RoboTwin
-```bibtex
-@article{wu2024robotwin,
-  title={RoboTwin: Dual-Arm Robot Benchmark with Generative Digital Twins},
-  author={Wu, Yao and others},
-  journal={arXiv preprint},
-  year={2024}
-}
-```
-
----
-
-## 🤝 Acknowledgments
-
-- **SARM Team** - Original paper and implementation
-- **LeRobot** - HuggingFace robot learning library
-- **RoboTwin** - Dual-arm simulation environment
-- **ALOHA** - Bimanual manipulation platform
-- **VJTI SRA** - Support and resources
-
----
-
-## 📜 License
-
-MIT License - See LICENSE file for details
-
----
-
-## 📧 Contact
-
-**Team:** SRA VJTI
-**Email:** tjgada_b24@ee.vjti.ac.in
-**GitHub:** [@Dimios45](https://github.com/Dimios45)
-**W&B:** [dimios45](https://wandb.ai/dimios45)
-
----
-
-## 🗺️ Roadmap
-
-### Completed ✅
-- [x] Packing task with SARM (90% success)
-- [x] ALOHA task with RA-BC (3x improvement)
-- [x] ACT baseline comparison
-- [x] Overfitting diagnostics
-- [x] Vision grounding fixes
-- [x] Complete documentation
-
-### In Progress 🔄
-- [ ] RA-BC Diffusion 80K training (ALOHA)
-- [ ] W&B dashboard for packing task
-
-### Future Work 🔮
-- [ ] Multi-stage SARM (sparse vs dense heads)
-- [ ] Cross-task transfer experiments
-- [ ] Real robot deployment (ALOHA hardware)
-- [ ] Larger dataset collection (100+ episodes)
-- [ ] Publication submission
-
----
-
-## 🌟 Star History
-
-If you find this work useful, please ⭐ star the repository!
-
----
-
-**Last Updated:** February 2026
