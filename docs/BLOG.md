@@ -36,6 +36,16 @@ The model uses a **dual-head transformer** architecture:
 
 Both heads share a backbone, giving complementary views of progress.
 
+**Sparse head — clean monotonic progress curve:**
+
+![SARM sparse prediction ep0](assets/sarm_prediction_ep0_sparse.png)
+
+**Dense head — rich 5-stage segmentation (approach → grasp → lift → transfer → release):**
+
+![SARM dense prediction ep0](assets/sarm_prediction_ep0_dense.png)
+
+The dense head clearly segments the 5 subtask stages across the episode. The sparse head produces a smooth monotonic curve closely tracking ground truth — exactly the signal RA-BC uses to compute per-frame quality weights.
+
 ### RA-BC: Reward-Aligned Behaviour Cloning
 
 RA-BC uses SARM progress scores to **weight each training sample** by how much forward progress it contributes:
@@ -110,6 +120,12 @@ At 20K steps all variants are within noise (~32±2%). RA-BC doesn't hurt, and wi
 | RA-BC (multi-scheme, κ=0.01) | 58% | −10pp |
 
 ACT reaches **68% success at 80K** — a strong result for a bimanual task from just 50 demos. RA-BC trails vanilla by 6pp at best, which we attribute to dataset characteristics rather than a fundamental limitation of the method.
+
+**Kappa has an outsized impact — getting it wrong costs 16pp:**
+
+![Kappa impact](assets/fig4_kappa_impact.png)
+
+The auto-computed kappa (0.241) discards ~half the training data, starving the model. The paper's κ=0.01 recovers 10pp by letting 95% of frames through.
 
 ### Learning Curve
 
