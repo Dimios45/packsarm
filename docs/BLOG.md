@@ -2,7 +2,6 @@
 
 > **TL;DR:** We implemented Stage-Aware Reward Models (SARM) and Reward-Aligned Behaviour Cloning (RA-BC) on the ALOHA bimanual manipulation task. RA-BC delivers a **3× improvement for DiffusionPolicy** (8% → 24%) over vanilla BC on just 50 expert demos — and we believe performance would scale significantly with larger, more diverse datasets where RA-BC's quality signal becomes richer.
 
-**Authors:** SRA VJTI · Veermata Jijabai Technological Institute
 **Reference paper:** [Stage-Aware Reward Modeling (arXiv 2509.25358)](https://arxiv.org/html/2509.25358)
 **Code:** [github.com/Dimios45/packsarm](https://github.com/Dimios45/packsarm)
 
@@ -177,4 +176,4 @@ ACT's 100-step action chunking means each training sample already captures a lon
 
 ---
 
-*SRA VJTI · February 2026*
+*February 2026*
