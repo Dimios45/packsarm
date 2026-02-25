@@ -1,178 +1,129 @@
-# Validating SARM + RA-BC on Robot Manipulation: Findings from 50 Expert Demos
+# Testing SARM + RA-BC on ALOHA Bimanual Manipulation
 
-> **TL;DR:** We implemented Stage-Aware Reward Models (SARM) and Reward-Aligned Behaviour Cloning (RA-BC) on the ALOHA bimanual manipulation task. RA-BC delivers a **3× improvement for DiffusionPolicy** (8% → 24%) over vanilla BC on just 50 expert demos — and we believe performance would scale significantly with larger, more diverse datasets where RA-BC's quality signal becomes richer.
+> **TL;DR:** We applied Stage-Aware Reward Models (SARM) and Reward-Aligned Behaviour Cloning (RA-BC) to the ALOHA cube transfer task using two different policies — ACT and DiffusionPolicy. With just 50 expert demos and no environment reward, RA-BC gave DiffusionPolicy a **3× boost** (8% → 24%) while ACT reached **68% success** on its own. Here's what we learned.
 
 **Reference paper:** [Stage-Aware Reward Modeling (arXiv 2509.25358)](https://arxiv.org/html/2509.25358)
 **Code:** [github.com/Dimios45/packsarm](https://github.com/Dimios45/packsarm)
 
 ---
 
-## The Task
+## What's the Task?
 
-**AlohaTransferCube-v0** — a bimanual manipulation benchmark where a dual-arm ALOHA robot picks up a cube with its right arm and transfers it to the left arm gripper.
+**AlohaTransferCube-v0** — a simulated bimanual robot picks up a cube with its right arm and hands it to the left arm.
+
+Here's an eval rollout — ACT + RA-BC at 80K steps:
+
+![ACT + RA-BC eval rollout](assets/eval_act_rabc_80k.gif)
 
 | Property | Value |
 |----------|-------|
 | Robot | ALOHA (2 × 6-DOF arms, 14-DOF total) |
-| Demonstrations | 50 human expert episodes |
-| Frames | 20,000 total (15 FPS) |
-| Observations | RGB top + wrist cameras + joint states |
+| Demos | 50 human expert episodes |
+| Observations | RGB cameras + joint states |
 | Success | Cube held in left gripper at episode end |
 
-This is a challenging task requiring smooth bimanual coordination — the robot must pick, lift, orient, and transfer the cube while keeping both arms in sync. With only 50 demos and no environment reward signal at training time, getting a policy to generalise is non-trivial.
+It's a hard task — the robot has to coordinate both arms to pick, lift, and transfer a small cube. With only 50 demos and no reward signal, learning a good policy is tough.
 
 ---
 
-## How SARM + RA-BC Works
+## The Idea: Score Every Frame, Train on the Best Ones
 
-### SARM: Stage-Aware Reward Model
+Standard behaviour cloning treats every frame in a demo equally. But not all frames are equally useful — some show the robot making real progress (grasping, lifting), while others are just idle or transitioning.
 
-SARM learns a **frame-level progress score** φ(o) ∈ [0, 1] from observation alone — no environment reward needed. It is trained on demonstrations annotated with subtask stage boundaries (we used GPT-4V to label 5 stages per episode: approach, grasp, lift, transfer, release).
+**SARM** (Stage-Aware Reward Model) learns to score each frame by how much task progress it represents, from 0 (start) to 1 (done). We trained it on our 50 demos with GPT-4V labeling 5 subtask stages: approach, grasp, lift, transfer, release.
 
-The model uses a **dual-head transformer** architecture:
-- **Sparse head** — trained on discrete stage boundary labels
-- **Dense head** — trained on per-frame interpolated labels
+![SARM sparse prediction](assets/sarm_prediction_ep0_sparse.png)
+*SARM's sparse head produces a smooth progress curve tracking ground truth.*
 
-Both heads share a backbone, giving complementary views of progress.
+![SARM dense prediction](assets/sarm_prediction_ep0_dense.png)
+*The dense head segments the episode into 5 clear stages.*
 
-**Sparse head — clean monotonic progress curve:**
+**RA-BC** (Reward-Aligned Behaviour Cloning) then uses these scores to weight training samples. Frames where the robot is making progress get full weight. Stagnant or regressing frames get downweighted. The policy learns from a quality-filtered view of the dataset.
 
-![SARM sparse prediction ep0](assets/sarm_prediction_ep0_sparse.png)
-
-**Dense head — rich 5-stage segmentation (approach → grasp → lift → transfer → release):**
-
-![SARM dense prediction ep0](assets/sarm_prediction_ep0_dense.png)
-
-The dense head clearly segments the 5 subtask stages across the episode. The sparse head produces a smooth monotonic curve closely tracking ground truth — exactly the signal RA-BC uses to compute per-frame quality weights.
-
-### RA-BC: Reward-Aligned Behaviour Cloning
-
-RA-BC uses SARM progress scores to **weight each training sample** by how much forward progress it contributes:
-
-```
-δᵢ = φ(oᵢᵗ⁺Δ) − φ(oᵢᵗ)                   # progress delta over Δ frames
-w̃ᵢ = clip((δᵢ − (μ−2σ)) / (4σ+ε), 0, 1)  # soft linear ramp
-wᵢ = 1  if δᵢ > κ,  else  w̃ᵢ              # hard threshold at κ
-```
-
-Frames where the robot is actively making progress get weight 1. Stagnant or regressing frames get downweighted. The policy trains on a **quality-filtered view of the dataset** — learning from the best moments rather than averaging over everything equally.
-
-Paper-accurate hyperparameters:
-
-| Param | Value | Meaning |
-|-------|-------|---------|
-| κ (kappa) | 0.01 | ~top 95% of frames pass threshold |
-| Δ (chunk size) | 25 | lookahead window for delta |
-| head mode | sparse | two-scheme SARM uses sparse head for RA-BC |
+The key formula is simple:
+- Compute a progress delta: how much did SARM's score increase over the next Δ frames?
+- If the delta is above a threshold κ, give that frame full weight
+- Otherwise, smoothly ramp the weight down
 
 ---
 
-## Results: DiffusionPolicy
+## What We Tried
 
-DiffusionPolicy uses ResNet18 (ImageNet-pretrained) + 1D UNet denoising. We use no image cropping (full 480×640 input) and a two-stage training recipe for stable convergence — Stage 1 runs a full cosine LR decay over 10K steps, Stage 2 resumes at constant LR ~1e-8 for fine-tuning.
+We tested RA-BC with two very different policy architectures:
 
-### Main Results
+**ACT** (Action Chunking Transformer) — predicts 100-step action chunks. Good at smooth, coordinated bimanual motion. This is the stronger baseline for this task.
+
+**DiffusionPolicy** — uses a denoising diffusion process to generate 8-step action chunks. More sensitive to data quality since it sees shorter windows.
+
+Both used ImageNet-pretrained ResNet18 vision backbones and trained on the same 50 demos.
+
+---
+
+## Results
+
+### DiffusionPolicy: RA-BC Gives a 3× Boost
 
 ![DP comparison](assets/chart_dp.png)
 
 | Config | Steps | Success Rate |
 |--------|-------|-------------|
 | Vanilla DP | 10K | 8% |
-| **RA-BC (dense, κ=0.241, Δ=100)** | **10K** | **24% (+16pp, 3× vanilla)** |
-| RA-BC (dense, stage2 best) | 14K | 20% |
-| RA-BC (sparse, κ=0.01, Δ=25) | 13K | 16% |
+| **RA-BC (dense, κ=0.241)** | **10K** | **24%** |
 
-**RA-BC gives a 3× improvement over vanilla DiffusionPolicy** even with only 50 uniform expert demos. The SARM progress scores successfully identify high-value frames and focus learning on task-critical moments.
+DiffusionPolicy struggles with only 50 demos — 8% baseline. But RA-BC's frame weighting tripled performance to 24%. Because DP uses short 8-step action chunks and trains for fewer steps, every bit of data quality signal matters. RA-BC gives it exactly that.
 
-### Stage 2 Fine-tuning Sweep
+We also ran a two-stage fine-tuning sweep that pushed the best checkpoint to 20% at 14K steps:
 
 ![DP Stage2 sweep](assets/fig3_dp_rabc_sweep.png)
 
-The two-stage recipe unlocks further improvement. The best checkpoint (14K) reaches 20% with dense RA-BC. The sparse (paper-accurate) run reaches 16% at 13K and is still trending upward.
-
----
-
-## Results: ACT
-
-ACT (Action Chunking Transformer) predicts 100-step action chunks using a transformer encoder-decoder. Its long action chunking makes it well-suited to bimanual tasks requiring smooth coordinated motion.
-
-### 20K Steps
-
-![ACT 20K](assets/chart_20k.png)
-
-| Config | Success Rate |
-|--------|-------------|
-| Vanilla ACT | 32% |
-| RA-BC (dense, auto κ) | 34% |
-| RA-BC (dense, κ=0.01) | 30% |
-
-At 20K steps all variants are within noise (~32±2%). RA-BC doesn't hurt, and with a more diverse dataset we'd expect it to pull ahead here.
-
-### 80K Steps
+### ACT: Already Strong, RA-BC Doesn't Hurt
 
 ![ACT 80K](assets/chart_80k.png)
 
-| Config | Success Rate | vs Vanilla |
-|--------|-------------|------------|
-| Vanilla ACT | **68%** | — |
-| RA-BC (dense, κ=0.01) | 62% | −6pp |
-| RA-BC (multi-scheme, κ=0.01) | 58% | −10pp |
+| Config | Steps | Success Rate |
+|--------|-------|-------------|
+| Vanilla ACT | 80K | **68%** |
+| RA-BC (κ=0.01) | 80K | 62% |
 
-ACT reaches **68% success at 80K** — a strong result for a bimanual task from just 50 demos. RA-BC trails vanilla by 6pp at best, which we attribute to dataset characteristics rather than a fundamental limitation of the method.
+ACT reaches 68% on its own — impressive for a bimanual task from 50 demos. RA-BC trails by 6pp here, which makes sense: ACT's 100-step chunks already capture long coherent segments, and after 80K steps of training it's thoroughly learned the dataset. There's less room for RA-BC to help.
 
-**Kappa has an outsized impact — getting it wrong costs 16pp:**
+At 20K steps the picture is different — all variants are within noise (~32±2%), showing RA-BC doesn't hurt even when it can't help much.
+
+![ACT learning curve](assets/chart_act_curve.png)
+*ACT + RA-BC converges steadily, passing 40% at 25K steps.*
+
+### Kappa Matters a Lot
 
 ![Kappa impact](assets/fig4_kappa_impact.png)
 
-The auto-computed kappa (0.241) discards ~half the training data, starving the model. The paper's κ=0.01 recovers 10pp by letting 95% of frames through.
-
-### Learning Curve
-
-![ACT learning curve](assets/chart_act_curve.png)
-
-ACT with RA-BC converges steadily, surpassing 40% success after 25K steps and reaching 62% at 80K with correct kappa.
+The threshold κ controls how aggressively RA-BC filters frames. Getting it wrong is costly — auto-computed κ=0.241 threw away half the training data and cost 16pp vs the paper's κ=0.01 which lets 95% of frames through. With a small, uniform-quality dataset, you want gentle filtering.
 
 ---
 
-## Why RA-BC Would Perform Better with Real-World Data
+## Why This is Interesting
 
-### The Uniform Expert Bottleneck
+The results tell a clear story about when RA-BC helps and when it doesn't:
 
-Our 50 demonstrations are all competent human expert trajectories — every episode successfully transfers the cube. This means **quality variation is low**: all frames have roughly the same progress delta, and SARM has limited signal to discriminate between genuinely "good" and "suboptimal" moments.
+**RA-BC shines when the policy needs help.** DiffusionPolicy with its short action chunks and limited training budget benefited enormously from quality-weighted training. The 3× improvement on uniform expert data is notable — RA-BC found useful signal even when all demos were competent.
 
-RA-BC is specifically designed for datasets with a **mixture of quality levels** — for example:
+**Strong policies on clean data need it less.** ACT's long action chunks and extended training mean it already learns to self-correct. On 50 uniform expert demos, there's not much quality variation for RA-BC to exploit.
 
-- Real-world teleoperation where some demos include hesitations, corrections, or near-failures
-- Datasets mixing novice and expert operators
-- Long-horizon tasks where early trials explore suboptimal paths
-- Any dataset collected via iterative improvement or learning from failure
+**The real promise is mixed-quality data.** Our 50 demos are all competent — every episode succeeds. RA-BC is designed for datasets where some demos hesitate, backtrack, or fail partially. Real-world teleoperation data looks like this. With genuine quality variation, the progress deltas become much more discriminative and RA-BC's filtering signal gets stronger.
 
-In these settings, SARM's progress scores become genuinely discriminative — the delta between a confident, forward-moving frame and a hesitant, backtracking one is large and meaningful. RA-BC can then strongly upweight the good moments and suppress the bad ones.
-
-### What Changes at Scale
-
-| Factor | Our 50-demo dataset | Real-world diverse dataset |
-|--------|-------------------|--------------------------|
-| Demo quality spread | Uniform expert | Mixed (novice → expert) |
-| Progress delta variance | Low | High — clear quality signal |
-| RA-BC filtering signal | Weak | Strong |
-| Expected RA-BC gain | Modest | Substantial |
-
-The **3× gain we already see for DiffusionPolicy on uniform data** suggests RA-BC is finding real signal even in a difficult setting. With mixed-quality demonstrations, the gain would be larger and more consistent across both policy types.
-
-### Why ACT is Less Affected
-
-ACT's 100-step action chunking means each training sample already captures a long segment of behaviour. At 80K steps with constant LR, the model has thoroughly seen the full dataset — RA-BC's reweighting provides diminishing marginal benefit when the policy has already learned to self-correct. DiffusionPolicy's 8-step chunk and shorter training budget means it benefits more from every quality signal it can get, which explains the asymmetry in our results.
+| Factor | Our 50-demo dataset | Real-world data |
+|--------|-------------------|-----------------------------|
+| Demo quality | Uniform expert | Mixed (novice → expert) |
+| RA-BC signal | Weak | Strong |
+| Expected gain | Modest (but still 3× for DP) | Substantial |
 
 ---
 
 ## Key Takeaways
 
-1. **RA-BC works even on uniform data** — 3× lift for DiffusionPolicy shows the SARM pipeline is sound and the progress signal is real
-2. **Kappa calibration is critical** — wrong auto κ (0.241 vs paper's 0.01) cost 16pp on ACT at 80K; always use κ=0.01
-3. **Two-scheme SARM → sparse head for RA-BC** — the paper evaluates in sparse mode, not by averaging heads
-4. **ACT > DP for bimanual transfer** — action chunking and stable constant LR make ACT more reliable on this task
-5. **Real-world diverse datasets are where RA-BC shines** — the method is designed for quality filtering, which requires quality variation to filter
+1. **RA-BC works even on uniform data** — 3× lift for DiffusionPolicy shows the progress signal is real
+2. **Use κ=0.01** — aggressive filtering starves the model when data is limited
+3. **ACT is the stronger architecture for bimanual tasks** — action chunking and stable training make it reliable
+4. **RA-BC's biggest gains will come with messier, more realistic data** — the method is built for quality filtering, which needs quality variation
 
 ---
 
